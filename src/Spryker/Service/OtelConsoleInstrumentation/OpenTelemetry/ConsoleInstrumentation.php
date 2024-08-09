@@ -10,6 +10,7 @@ namespace Spryker\Service\OtelConsoleInstrumentation\OpenTelemetry;
 use Exception;
 use OpenTelemetry\API\Trace\Propagation\TraceContextPropagator;
 use OpenTelemetry\API\Trace\Span;
+use OpenTelemetry\API\Trace\SpanInterface;
 use OpenTelemetry\API\Trace\SpanKind;
 use OpenTelemetry\API\Trace\StatusCode;
 use OpenTelemetry\Context\Context;
@@ -26,7 +27,7 @@ class ConsoleInstrumentation implements ConsoleInstrumentationInterface
     /**
      * @var string
      */
-    protected const RUN_METHOD_NAME = 'run';
+    protected const METHOD_NAME = 'run';
 
     /**
      * @var string
@@ -65,9 +66,11 @@ class ConsoleInstrumentation implements ConsoleInstrumentationInterface
     ): void {
         hook(
             class: ConsoleApplication::class,
-            function: static::RUN_METHOD_NAME,
+            function: static::METHOD_NAME,
             pre: static function ($instance, array $params, string $class, string $function, ?string $filename, ?int $lineno) use ($instrumentation, $request): void {
-                define('OTEL_CLI_TRACE_ID', uuid_create());
+                if (!defined('OTEL_CLI_TRACE_ID')) {
+                    define('OTEL_CLI_TRACE_ID', uuid_create());
+                }
 
                 $input = [static::CLI_TRACE_ID => OTEL_CLI_TRACE_ID];
                 TraceContextPropagator::getInstance()->inject($input);
@@ -75,7 +78,6 @@ class ConsoleInstrumentation implements ConsoleInstrumentationInterface
                 $span = $instrumentation::getCachedInstrumentation()
                     ->tracer()
                     ->spanBuilder(implode(' ', $request->server->get('argv')))
-                    ->setAttribute('CLI_ID', \OTEL_CLI_TRACE_ID)
                     ->setSpanKind(SpanKind::KIND_SERVER)
                     ->setAttribute(TraceAttributes::CODE_FUNCTION, $function)
                     ->setAttribute(TraceAttributes::CODE_NAMESPACE, $class)
@@ -103,7 +105,7 @@ class ConsoleInstrumentation implements ConsoleInstrumentationInterface
      *
      * @return \OpenTelemetry\API\Trace\Span
      */
-    protected static function handleError(ContextStorageScopeInterface $scope): Span
+    protected static function handleError(ContextStorageScopeInterface $scope): SpanInterface
     {
         $error = error_get_last();
 
@@ -116,13 +118,13 @@ class ConsoleInstrumentation implements ConsoleInstrumentationInterface
         $scope->detach();
         $span = Span::fromContext($scope->context());
 
-        if ($exception) {
+        if (isset($exception)) {
             $span->recordException($exception);
         }
 
-        $span->setAttribute(static::ERROR_MESSAGE, $exception ? $exception->getMessage() : '');
-        $span->setAttribute(static::ERROR_CODE, $exception ? $exception->getCode() : '');
-        $span->setStatus($exception ? StatusCode::STATUS_ERROR : StatusCode::STATUS_OK);
+        $span->setAttribute(static::ERROR_MESSAGE, isset($exception) ? $exception->getMessage() : '');
+        $span->setAttribute(static::ERROR_CODE, isset($exception) ? $exception->getCode() : '');
+        $span->setStatus(isset($exception) ? StatusCode::STATUS_ERROR : StatusCode::STATUS_OK);
 
         $span->end();
 

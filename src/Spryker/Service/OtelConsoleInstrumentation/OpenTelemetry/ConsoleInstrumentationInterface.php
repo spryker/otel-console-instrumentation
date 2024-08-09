@@ -18,5 +18,5 @@ interface ConsoleInstrumentationInterface
      *
      * @return void
      */
-    public function register(CachedInstrumentation $instrumentation, Request $request): void;
+    public static function register(CachedInstrumentation $instrumentation, Request $request): void;
 }
