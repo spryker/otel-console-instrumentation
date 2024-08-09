@@ -16,6 +16,8 @@ use OpenTelemetry\API\Trace\StatusCode;
 use OpenTelemetry\Context\Context;
 use OpenTelemetry\Context\ContextStorageScopeInterface;
 use OpenTelemetry\SemConv\TraceAttributes;
+use Spryker\Shared\Opentelemetry\Instrumentation\CachedInstrumentationInterface;
+use Spryker\Shared\Opentelemetry\Request\RequestProcessorInterface;
 use Spryker\Zed\Opentelemetry\Business\Generator\Instrumentation\CachedInstrumentation;
 use Symfony\Component\Console\Application as ConsoleApplication;
 use Symfony\Component\HttpFoundation\Request;
@@ -28,11 +30,6 @@ class ConsoleInstrumentation implements ConsoleInstrumentationInterface
      * @var string
      */
     protected const METHOD_NAME = 'run';
-
-    /**
-     * @var string
-     */
-    protected const SPAN_NAME_PLACEHOLDER = 'Console command: %s';
 
     /**
      * @var string
@@ -55,14 +52,14 @@ class ConsoleInstrumentation implements ConsoleInstrumentationInterface
     protected const ERROR_TEXT_PLACEHOLDER = 'Error: %s in %s on line %d';
 
     /**
-     * @param \Spryker\Zed\Opentelemetry\Business\Generator\Instrumentation\CachedInstrumentation $instrumentation
-     * @param \Symfony\Component\HttpFoundation\Request $request
+     * @param \Spryker\Shared\Opentelemetry\Instrumentation\CachedInstrumentationInterface $instrumentation
+     * @param \Spryker\Shared\Opentelemetry\Request\RequestProcessorInterface $request
      *
      * @return void
      */
     public static function register(
-        CachedInstrumentation $instrumentation,
-        Request $request
+        CachedInstrumentationInterface $instrumentation,
+        RequestProcessorInterface $request
     ): void {
         hook(
             class: ConsoleApplication::class,
@@ -77,13 +74,13 @@ class ConsoleInstrumentation implements ConsoleInstrumentationInterface
 
                 $span = $instrumentation::getCachedInstrumentation()
                     ->tracer()
-                    ->spanBuilder(implode(' ', $request->server->get('argv')))
+                    ->spanBuilder(static::formatSpanName($request->getRequest()))
                     ->setSpanKind(SpanKind::KIND_SERVER)
                     ->setAttribute(TraceAttributes::CODE_FUNCTION, $function)
                     ->setAttribute(TraceAttributes::CODE_NAMESPACE, $class)
                     ->setAttribute(TraceAttributes::CODE_FILEPATH, $filename)
                     ->setAttribute(TraceAttributes::CODE_LINENO, $lineno)
-                    ->setAttribute(TraceAttributes::URL_QUERY, $request->getQueryString())
+                    ->setAttribute(TraceAttributes::URL_QUERY, $request->getRequest()->getQueryString())
                     ->startSpan();
 
                 Context::storage()->attach($span->storeInContext(Context::getCurrent()));
@@ -132,12 +129,12 @@ class ConsoleInstrumentation implements ConsoleInstrumentationInterface
     }
 
     /**
-     * @param string $name
+     * @param \Symfony\Component\HttpFoundation\Request $request
      *
      * @return string
      */
-    protected static function formatSpanName(string $name): string
+    protected static function formatSpanName(Request $request): string
     {
-        return sprintf(static::SPAN_NAME_PLACEHOLDER, $name);
+        return implode(' ', $request->server->get('argv'));
     }
 }

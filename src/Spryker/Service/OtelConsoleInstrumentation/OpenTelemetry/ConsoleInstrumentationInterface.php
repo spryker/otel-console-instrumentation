@@ -7,16 +7,18 @@
 
 namespace Spryker\Service\OtelConsoleInstrumentation\OpenTelemetry;
 
+use Spryker\Shared\Opentelemetry\Instrumentation\CachedInstrumentationInterface;
+use Spryker\Shared\Opentelemetry\Request\RequestProcessorInterface;
 use Spryker\Zed\Opentelemetry\Business\Generator\Instrumentation\CachedInstrumentation;
 use Symfony\Component\HttpFoundation\Request;
 
 interface ConsoleInstrumentationInterface
 {
     /**
-     * @param \Spryker\Zed\Opentelemetry\Business\Generator\Instrumentation\CachedInstrumentation $instrumentation
-     * @param \Symfony\Component\HttpFoundation\Request $request
+     * @param \Spryker\Shared\Opentelemetry\Instrumentation\CachedInstrumentationInterface $instrumentation
+     * @param \Spryker\Shared\Opentelemetry\Request\RequestProcessorInterface $request
      *
      * @return void
      */
-    public static function register(CachedInstrumentation $instrumentation, Request $request): void;
+    public static function register(CachedInstrumentationInterface $instrumentation, RequestProcessorInterface $request): void;
 }
