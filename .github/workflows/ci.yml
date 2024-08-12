@@ -1,52 +1,106 @@
 name: CI
 
 on:
+    pull_request:
     push:
         branches:
-            - 'master'
-    pull_request:
+            - master
     workflow_dispatch:
 
 jobs:
     validation:
-        name: Validation
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-20.04
+        strategy:
+            fail-fast: false
+            matrix:
+                php-version: [
+                    '8.1',
+                    '8.2'
+                ]
 
         steps:
-            - uses: actions/checkout@v3
-
             - name: Setup PHP
               uses: shivammathur/setup-php@v2
               with:
-                  php-version: '8.2'
-                  extensions: mbstring, intl, bcmath
-                  coverage: none
+                  php-version: ${{ matrix.php-version }}
+                  extensions: mbstring, intl, pdo_mysql
 
-            - name: Composer Install
-              run: composer install --prefer-dist --no-interaction --profile
+            - name: Checkout
+              uses: actions/checkout@v2
 
-            - name: Run validation
+            - name: Composer validate
               run: composer validate
 
-            - name: Syntax check
-              run: find ./src -path src -prune -o -type f -name '*.php' -print0 | xargs -0 -n1 -P4 php -l -n | (! grep -v "No syntax errors detected" )
+            - name: Composer get cache directory
+              id: composer-cache
+              run: |
+                  echo "::set-output name=dir::$(composer config cache-files-dir)"
 
-    lowest:
-        name: Prefer Lowest
-        runs-on: ubuntu-latest
+            - name: Composer cache
+              uses: actions/cache@v2
+              with:
+                  path: ${{ steps.composer-cache.outputs.dir }}
+                  key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+                  restore-keys: |
+                      ${{ runner.os }}-composer-
+
+            - name: Composer install
+              run: |
+                  composer --version
+                  composer install --optimize-autoloader
+
+            - name: Codeception tests
+              run: |
+                  if [[ ${{ matrix.php-version }} == '8.1' ]]; then
+                    vendor/bin/codecept build
+                    XDEBUG_MODE=coverage vendor/bin/codecept run --coverage-xml
+                  else
+                    composer test
+                  fi
+
+            - name: Code Coverage Report
+              if: success() && matrix.php-version == '8.1'
+              uses: codecov/codecov-action@v1
+
+            - name: PHPStan checks
+              run: composer phpstan
+
+            - name: CodeStyle checks
+              run: composer cs-check
+
+    prefer-lowest:
+        runs-on: ubuntu-20.04
+        strategy:
+            fail-fast: false
+            matrix:
+                php-version: [
+                    '8.1'
+                ]
 
         steps:
-            - uses: actions/checkout@v3
+            - name: Checkout
+              uses: actions/checkout@v2
 
             - name: Setup PHP
               uses: shivammathur/setup-php@v2
               with:
-                  php-version: '8.1'
-                  extensions: mbstring, intl, bcmath
-                  coverage: none
+                  php-version: ${{ matrix.php-version }}
+                  extensions: mbstring, intl, pdo_mysql
 
-            - name: Composer Install
-              run: composer install --prefer-dist --no-interaction --profile
+            - name: Get Composer Cache Directory
+              id: composer-cache
+              run: |
+                  echo "::set-output name=dir::$(composer config cache-files-dir)"
 
-            - name: Composer Update
-              run: composer update --prefer-lowest --prefer-dist --no-interaction --profile -vvv
+            - name: Composer cache
+              uses: actions/cache@v2
+              with:
+                  path: ${{ steps.composer-cache.outputs.dir }}
+                  key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+                  restore-keys: ${{ runner.os }}-composer-
+
+            - name: Composer prefer-lowest
+              run: composer update --prefer-dist --no-interaction --prefer-lowest --prefer-stable -o
+
+            - name: Codecept run test
+              run: composer test

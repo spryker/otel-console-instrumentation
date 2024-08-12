@@ -1,2 +1,5 @@
 parameters:
     level: 8
+    checkMissingIterableValueType: false
+    ignoreErrors:
+        - '#Parameter \#[1-9] .+ of method OpenTelemetry\\API\\Trace\\.+::.+\(\) expects non-empty-string, string given.#'
