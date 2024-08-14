@@ -23,7 +23,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Throwable;
 use function OpenTelemetry\Instrumentation\hook;
 
-class ConsoleInstrumentation implements ConsoleInstrumentationInterface
+class ConsoleInstrumentation
 {
     /**
      * @var string
