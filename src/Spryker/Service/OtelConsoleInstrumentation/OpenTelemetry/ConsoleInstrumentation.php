@@ -16,8 +16,8 @@ use OpenTelemetry\API\Trace\StatusCode;
 use OpenTelemetry\Context\Context;
 use OpenTelemetry\Context\ContextStorageScopeInterface;
 use OpenTelemetry\SemConv\TraceAttributes;
-use Spryker\Shared\Opentelemetry\Instrumentation\CachedInstrumentationInterface;
-use Spryker\Shared\Opentelemetry\Request\RequestProcessorInterface;
+use Spryker\Shared\Opentelemetry\Instrumentation\CachedInstrumentation;
+use Spryker\Shared\Opentelemetry\Request\RequestProcessor;
 use Symfony\Component\Console\Application as ConsoleApplication;
 use Symfony\Component\HttpFoundation\Request;
 use Throwable;
@@ -51,15 +51,13 @@ class ConsoleInstrumentation
     protected const ERROR_TEXT_PLACEHOLDER = 'Error: %s in %s on line %d';
 
     /**
-     * @param \Spryker\Shared\Opentelemetry\Instrumentation\CachedInstrumentationInterface $instrumentation
-     * @param \Spryker\Shared\Opentelemetry\Request\RequestProcessorInterface $request
-     *
      * @return void
      */
-    public static function register(
-        CachedInstrumentationInterface $instrumentation,
-        RequestProcessorInterface $request
-    ): void {
+    public static function register(): void
+    {
+        $instrumentation = new CachedInstrumentation();
+        $request = new RequestProcessor();
+
         // phpcs:disable
         hook(
             class: ConsoleApplication::class,
