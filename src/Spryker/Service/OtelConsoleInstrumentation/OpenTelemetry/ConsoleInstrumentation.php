@@ -33,7 +33,12 @@ class ConsoleInstrumentation
     /**
      * @var string
      */
-    protected const METHOD_NAME = 'doRun';
+    protected const METHOD_NAME_RUN = 'doRun';
+
+    /**
+     * @var string
+     */
+    protected const METHOD_NAME_BOOTSTRAP = '__construct';
 
     /**
      * @var string
@@ -75,7 +80,7 @@ class ConsoleInstrumentation
 
         hook(
             class: ConsoleApplication::class,
-            function: static::METHOD_NAME,
+            function: static::METHOD_NAME_RUN,
             pre: static function ($instance, array $params, string $class, string $function, ?string $filename, ?int $lineno) use ($request): void {
                 $instrumentation = CachedInstrumentation::getCachedInstrumentation();
                 if ($instrumentation === null || $request->getRequest() === null) {
@@ -132,7 +137,7 @@ class ConsoleInstrumentation
     {
         hook(
             class: $className,
-            function: '__construct',
+            function: static::METHOD_NAME_BOOTSTRAP,
             pre: static function ($instance, array $params, string $class, string $function, ?string $filename, ?int $lineno) use ($requestProcessor, $application): void {
                 putenv('OTEL_SERVICE_NAME=' . $application);
                 $instrumentation = CachedInstrumentation::getCachedInstrumentation();
@@ -149,7 +154,7 @@ class ConsoleInstrumentation
 
                 $span = $instrumentation
                     ->tracer()
-                    ->spanBuilder(static::formatSpanName($requestProcessor->getRequest()))
+                    ->spanBuilder('Boot: ' . static::formatSpanName($requestProcessor->getRequest()))
                     ->setSpanKind(SpanKind::KIND_SERVER)
                     ->setAttribute(TraceAttributes::CODE_FUNCTION, $function)
                     ->setAttribute(TraceAttributes::CODE_NAMESPACE, $class)
