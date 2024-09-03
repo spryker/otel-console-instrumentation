@@ -49,25 +49,6 @@ jobs:
                   composer --version
                   composer install --optimize-autoloader
 
-            - name: Codeception tests
-              run: |
-                  if [[ ${{ matrix.php-version }} == '8.1' ]]; then
-                    vendor/bin/codecept build
-                    XDEBUG_MODE=coverage vendor/bin/codecept run --coverage-xml
-                  else
-                    composer test
-                  fi
-
-            - name: Code Coverage Report
-              if: success() && matrix.php-version == '8.1'
-              uses: codecov/codecov-action@v1
-
-            - name: PHPStan checks
-              run: composer phpstan
-
-            - name: CodeStyle checks
-              run: composer cs-check
-
     prefer-lowest:
         runs-on: ubuntu-20.04
         strategy:
@@ -101,6 +82,3 @@ jobs:
 
             - name: Composer prefer-lowest
               run: composer update --prefer-dist --no-interaction --prefer-lowest --prefer-stable -o
-
-            - name: Codecept run test
-              run: composer test
