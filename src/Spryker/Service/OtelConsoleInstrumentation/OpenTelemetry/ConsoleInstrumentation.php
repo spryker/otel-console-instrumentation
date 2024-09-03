@@ -16,8 +16,12 @@ use OpenTelemetry\API\Trace\StatusCode;
 use OpenTelemetry\Context\Context;
 use OpenTelemetry\Context\ContextStorageScopeInterface;
 use OpenTelemetry\SemConv\TraceAttributes;
+use Spryker\Glue\Console\ConsoleBootstrap;
+use Spryker\Service\Opentelemetry\Storage\CustomParameterStorage;
 use Spryker\Shared\Opentelemetry\Instrumentation\CachedInstrumentation;
 use Spryker\Shared\Opentelemetry\Request\RequestProcessor;
+use Spryker\Yves\Console\Bootstrap\ConsoleBootstrap as YvesConsoleBootstrap;
+use Spryker\Zed\Console\Communication\Bootstrap\ConsoleBootstrap as ZedConsoleBootstrap;
 use Spryker\Zed\Opentelemetry\Business\Generator\SpanFilter\SamplerSpanFilter;
 use Symfony\Component\Console\Application as ConsoleApplication;
 use Symfony\Component\HttpFoundation\Request;
@@ -29,7 +33,7 @@ class ConsoleInstrumentation
     /**
      * @var string
      */
-    protected const METHOD_NAME = 'run';
+    protected const METHOD_NAME = 'doRun';
 
     /**
      * @var string
@@ -59,6 +63,16 @@ class ConsoleInstrumentation
         $request = new RequestProcessor();
 
         // phpcs:disable
+        $bootstraps = [
+            ConsoleBootstrap::class => 'Glue CLI',
+            YvesConsoleBootstrap::class => 'Yves CLI',
+            ZedConsoleBootstrap::class => 'Zed CLI',
+        ];
+
+        foreach ($bootstraps as $bootstrap => $application) {
+            static::registerBootstrapHook($bootstrap, $application, $request);
+        }
+
         hook(
             class: ConsoleApplication::class,
             function: static::METHOD_NAME,
@@ -77,7 +91,7 @@ class ConsoleInstrumentation
 
                 $span = $instrumentation
                     ->tracer()
-                    ->spanBuilder(static::formatSpanName($request->getRequest()))
+                    ->spanBuilder('Run: ' . static::formatSpanName($request->getRequest()))
                     ->setSpanKind(SpanKind::KIND_SERVER)
                     ->setAttribute(TraceAttributes::CODE_FUNCTION, $function)
                     ->setAttribute(TraceAttributes::CODE_NAMESPACE, $class)
@@ -97,12 +111,69 @@ class ConsoleInstrumentation
                 }
 
                 $span = static::handleError($scope);
-                SamplerSpanFilter::filter($span, true);
+                $span->setAttribute('hasCustomParams', true);
+                $span->setAttributes(CustomParameterStorage::getInstance()->getAttributes());
+                $span = SamplerSpanFilter::filter($span, true);
 
                 $span->end();
             },
         );
         // phpcs:enable
+    }
+
+    /**
+     * @param string $className
+     * @param string $application
+     * @param \Spryker\Shared\Opentelemetry\Request\RequestProcessor $requestProcessor
+     *
+     * @return void
+     */
+    protected static function registerBootstrapHook(string $className, string $application, RequestProcessor $requestProcessor): void
+    {
+        hook(
+            class: $className,
+            function: '__construct',
+            pre: static function ($instance, array $params, string $class, string $function, ?string $filename, ?int $lineno) use ($requestProcessor, $application): void {
+                putenv('OTEL_SERVICE_NAME=' . $application);
+                $instrumentation = CachedInstrumentation::getCachedInstrumentation();
+                if ($instrumentation === null || $requestProcessor->getRequest() === null) {
+                    return;
+                }
+
+                if (!defined('OTEL_CLI_TRACE_ID')) {
+                    define('OTEL_CLI_TRACE_ID', uuid_create());
+                }
+
+                $input = [static::CLI_TRACE_ID => OTEL_CLI_TRACE_ID];
+                TraceContextPropagator::getInstance()->inject($input);
+
+                $span = $instrumentation
+                    ->tracer()
+                    ->spanBuilder(static::formatSpanName($requestProcessor->getRequest()))
+                    ->setSpanKind(SpanKind::KIND_SERVER)
+                    ->setAttribute(TraceAttributes::CODE_FUNCTION, $function)
+                    ->setAttribute(TraceAttributes::CODE_NAMESPACE, $class)
+                    ->setAttribute(TraceAttributes::CODE_FILEPATH, $filename)
+                    ->setAttribute(TraceAttributes::CODE_LINENO, $lineno)
+                    ->setAttribute(TraceAttributes::URL_QUERY, $requestProcessor->getRequest()->getQueryString())
+                    ->startSpan();
+                $span->activate();
+
+                Context::storage()->attach($span->storeInContext(Context::getCurrent()));
+            },
+            post: static function ($instance, array $params, $returnValue, ?Throwable $exception): void {
+                $scope = Context::storage()->scope();
+
+                if ($scope === null) {
+                    return;
+                }
+
+                $span = static::handleError($scope);
+                SamplerSpanFilter::filter($span, true);
+
+                $span->end();
+            },
+        );
     }
 
     /**
