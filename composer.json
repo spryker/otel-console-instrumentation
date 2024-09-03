@@ -1,0 +1,54 @@
+{
+    "name": "spryker/otel-console-instrumentation",
+    "type": "library",
+    "description": "OtelConsoleInstrumentation package",
+    "license": "proprietary",
+    "require": {
+        "open-telemetry/api": "^1.0",
+        "open-telemetry/context": "^1.0",
+        "open-telemetry/sem-conv": "^1.0",
+        "php": ">=8.1",
+        "spryker/opentelemetry": "^0.1.0",
+        "spryker/symfony": "^3.0.0"
+    },
+    "require-dev": {
+        "spryker/code-sniffer": "*",
+        "spryker/testify": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "Spryker\\": "src/Spryker/"
+        },
+        "files": [
+            "_register.php"
+        ]
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "scripts": {
+        "cs-check": "phpcs -p -s --standard=vendor/spryker/code-sniffer/SprykerStrict/ruleset.xml --ignore=/tests/_data/,/_support/ src/",
+        "cs-fix": "phpcbf -p --standard=vendor/spryker/code-sniffer/SprykerStrict/ruleset.xml --ignore=/tests/_data/,/_support/ src/",
+        "phpstan": "phpstan analyze",
+        "test": "codecept build && codecept run"
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-master": "1.0.x-dev"
+        }
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "dealerdirect/phpcodesniffer-composer-installer": true
+        }
+    },
+    "authors": [
+        {
+            "name": "Spryker",
+            "homepage": "https://spryker.com"
+        }
+    ],
+    "include-path": [
+        "src/"
+    ]
+}
